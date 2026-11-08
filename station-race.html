@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Station Race – Taipei MRT game</title>
+<style>
+:root{--R:#E3002C;--BL:#0070BD;--G:#008659;--O:#F8B61C;--BR:#C48C31;--ink:#1c2630;--mute:#6a7683;--rule:#dde2e8;--bg:#eef1f4;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:"Noto Sans","Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);display:flex;justify-content:center}
+.app{width:100%;max-width:440px;min-height:100vh;background:#fff;display:flex;flex-direction:column}
+.stripe{display:flex;height:8px}.stripe i{flex:1}
+header{display:flex;justify-content:space-between;align-items:baseline;padding:16px 20px 8px}
+h1{font-size:20px;margin:0;font-weight:700}
+.stat{font-size:14px;color:var(--mute)}.stat b{color:var(--ink)}
+main{flex:1;padding:0 20px 24px}
+.tip{font-size:14px;color:var(--mute);margin:0 0 10px;line-height:1.4}
+.trip{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 10px}
+.sign{border:3px solid var(--ink);border-radius:12px;padding:8px 12px;min-height:72px}
+.sign small{display:block;font-size:13px;color:var(--mute)}
+.sign b{display:block;font-size:17px;line-height:1.25;margin:1px 0 4px}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:5px;vertical-align:-2px}
+.map{height:250px;overflow:auto;border:2px solid var(--rule);border-radius:12px;margin:0 0 6px;background:#fbfcfd;-webkit-overflow-scrolling:touch}
+.map svg{display:block;font-family:inherit}
+.key{font-size:13px;color:var(--mute);margin:0 0 12px}
+.clock{display:flex;justify-content:space-between;font-size:15px;color:var(--mute);margin-bottom:8px}
+.clock b{color:var(--ink)}
+.log{list-style:none;margin:0 0 12px;padding:0}
+.log li{position:relative;padding:0 0 10px 30px;font-size:15px;line-height:1.35}
+.log li::before{content:"";position:absolute;left:8px;top:14px;bottom:-4px;width:5px;border-radius:3px;background:var(--c)}
+.log li::after{content:"";position:absolute;left:2px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--c)}
+.log li:last-child::before{display:none}
+.log em{font-style:normal;color:var(--mute);font-size:13px}
+.here{font-size:17px;margin:4px 0 10px}
+.opt{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;text-align:left;font:inherit;background:#fff;color:var(--ink);border:2px solid var(--rule);border-left:8px solid var(--c);border-radius:10px;padding:12px 14px;margin:0 0 8px;cursor:pointer}
+.opt b{font-size:17px}.opt span{font-size:14px;color:var(--mute);white-space:nowrap}
+.opt.goal{border-color:var(--ink);border-left-color:var(--c);background:#f6f8fa}
+.opt.hint{border-style:dashed;border-color:var(--ink);border-left-style:solid}
+.opt:focus-visible,button:focus-visible{outline:3px solid #bcd9f0;outline-offset:2px}
+button.main{width:100%;font:inherit;font-weight:700;font-size:17px;border:0;border-radius:10px;padding:14px;background:var(--ink);color:#fff;cursor:pointer;margin-top:6px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button.ghost{width:100%;font:inherit;font-weight:600;font-size:15px;background:#fff;color:var(--ink);border:2px solid var(--rule);border-radius:10px;padding:11px;margin-top:4px;cursor:pointer}
+.msg{min-height:22px;margin:8px 0 0;font-size:15px}
+.big{font-size:52px;font-weight:700;line-height:1;margin:8px 0 4px}
+.res p{margin:6px 0;font-size:16px}.muted{color:var(--mute)}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stripe"><i style="background:var(--R)"></i><i style="background:var(--O)"></i><i style="background:var(--G)"></i><i style="background:var(--BL)"></i><i style="background:var(--BR)"></i></div>
+  <header><h1>Station Race</h1><div class="stat" id="stat"></div></header>
+  <main id="play">
+    <p class="tip">Get from A to B in the fewest minutes. Ride to a transfer station (white dot), switch lines, repeat. Drag the map to look around.</p>
+    <div class="trip"><div class="sign"><small>From (A)</small><b id="a"></b><span id="al"></span></div><div class="sign"><small>To (B)</small><b id="b"></b><span id="bl"></span></div></div>
+    <div class="map" id="map"></div>
+    <p class="key">Ring = you are here. Each stop is 2 min, each transfer is 5 min.</p>
+    <div class="clock"><span>Trip time <b id="t">0 min</b></span><span>Transfers <b id="x">0</b></span></div>
+    <ul class="log" id="log"></ul>
+    <div id="ask">
+      <div class="here" id="here"></div>
+      <div id="opts"></div>
+      <div class="two"><button class="ghost" id="hintBtn">Hint (−15 pts)</button><button class="ghost" id="undo">Undo last ride</button></div>
+      <div class="msg" id="msg"></div>
+    </div>
+    <div id="done" class="hide res"></div>
+  </main>
+  <main id="end" class="hide res">
+    <p class="muted" style="margin-top:28px;font-size:17px">Final score</p>
+    <div class="big" id="final"></div>
+    <p id="rank" style="font-size:17px;margin-bottom:20px"></p>
+    <button class="main" id="again">Play again</button>
+  </main>
+</div>
+<script>
+const LN={R:"Red Line",BL:"Blue Line",G:"Green Line",O:"Orange Line",BR:"Brown Line"};
+const CH={
+R:[["Tamsui","Hongshulin","Zhuwei","Guandu","Zhongyi","Fuxinggang","Beitou","Qiyan","Qilian","Shipai","Mingde","Zhishan","Shilin","Jiantan","Yuanshan","Minquan W. Rd","Shuanglian","Zhongshan","Taipei Main Station","NTU Hospital","Chiang Kai-Shek Memorial Hall","Dongmen","Daan Park","Daan","Xinyi Anhe","Taipei 101/World Trade Center","Xiangshan"],["Beitou","Xinbeitou"]],
+BL:[["Dingpu","Yongning","Tucheng","Haishan","Far Eastern Hospital","Fuzhong","Banqiao","Xinpu","Jiangzicui","Longshan Temple","Ximen","Taipei Main Station","Shandao Temple","Zhongxiao Xinsheng","Zhongxiao Fuxing","Zhongxiao Dunhua","Sun Yat-Sen Memorial Hall","Taipei City Hall","Yongchun","Houshanpi","Kunyang","Nangang","Taipei Nangang Exhibition Center"]],
+G:[["Xindian","Xindian District Office","Qizhang","Dapinglin","Jingmei","Wanlong","Gongguan","Taipower Building","Guting","Chiang Kai-Shek Memorial Hall","Xiaonanmen","Ximen","Beimen","Zhongshan","Songjiang Nanjing","Nanjing Fuxing","Taipei Arena","Nanjing Sanmin","Songshan"],["Qizhang","Xiaobitan"]],
+O:[["Nanshijiao","Jingan","Yongan Market","Dingxi","Guting","Dongmen","Zhongxiao Xinsheng","Songjiang Nanjing","Xingtian Temple","Zhongshan Elementary School","Minquan W. Rd","Daqiaotou","Taipei Bridge","Cailiao","Sanchong","Xianse Temple","Touqianzhuang","Xinzhuang"]],
+BR:[["Taipei Zoo","Muzha","Wanfang Community","Wanfang Hospital","Xinhai","Linguang","Liuzhangli","Technology Building","Daan","Zhongxiao Fuxing","Nanjing Fuxing","Zhongshan Junior High School","Songshan Airport","Dazhi","Jiannan Road","Xihu","Gangqian","Wende","Neihu","Dahu Park","Huzhou","Donghu","Nangang Software Park","Taipei Nangang Exhibition Center"]]
+};
+/* schematic map: anchor stations and their x,y on the drawing */
+const NEC="Taipei Nangang Exhibition Center",CKS="Chiang Kai-Shek Memorial Hall";
+const AN={
+R:[["Tamsui",30,20],["Minquan W. Rd",150,70],["Zhongshan",190,115],["Taipei Main Station",150,170],[CKS,175,225],["Dongmen",215,250],["Daan",320,250],["Xiangshan",410,215]],
+BL:[["Dingpu",15,260],["Ximen",95,205],["Taipei Main Station",150,170],["Zhongxiao Xinsheng",240,175],["Zhongxiao Fuxing",330,180],[NEC,440,150]],
+G:[["Xindian",155,355],["Guting",175,290],[CKS,175,225],["Ximen",95,205],["Zhongshan",190,115],["Songjiang Nanjing",265,125],["Nanjing Fuxing",330,125],["Songshan",400,105]],
+O:[["Nanshijiao",55,350],["Guting",175,290],["Dongmen",215,250],["Zhongxiao Xinsheng",240,175],["Songjiang Nanjing",265,125],["Minquan W. Rd",150,70],["Xinzhuang",15,115]],
+BR:[["Taipei Zoo",390,350],["Daan",320,250],["Zhongxiao Fuxing",330,180],["Nanjing Fuxing",330,125],[NEC,440,150]]
+};
+/* hub labels: text, anchor, dx, dy */
+const HL={"Minquan W. Rd":["Minquan W. Rd","start",8,-6],"Zhongshan":["Zhongshan","start",7,-8],"Taipei Main Station":["Taipei Main","end",-9,4],"Ximen":["Ximen","end",-9,-4],[CKS]:["CKS Memorial Hall","end",-9,14],"Dongmen":["Dongmen","start",8,15],"Guting":["Guting","start",9,5],"Zhongxiao Xinsheng":["Zhongxiao Xinsheng","end",-8,-9],"Songjiang Nanjing":["Songjiang Nanjing","end",-8,19],"Nanjing Fuxing":["Nanjing Fuxing","end",-8,-9],"Zhongxiao Fuxing":["Zhongxiao Fuxing","start",8,19],"Daan":["Daan","end",-9,15],[NEC]:["Nangang Exh. Ctr","start",9,4]};
+const MIN_STOP=2,MIN_XFER=5,ROUNDS=5,HINT_COST=15;
+const adj={},st={},P={};
+for(const L in CH){adj[L]={};for(const c of CH[L]){c.forEach((n,i)=>{(st[n]=st[n]||new Set()).add(L);adj[L][n]=adj[L][n]||new Set();if(i){adj[L][n].add(c[i-1]);(adj[L][c[i-1]]=adj[L][c[i-1]]||new Set()).add(n)}})}}
+for(const L in AN){const a=AN[L],ch=CH[L][0],ix=a.map(x=>ch.indexOf(x[0]));
+  ch.forEach((n,i)=>{let k=0;while(k<a.length-2&&i>ix[k+1])k++;const t=(i-ix[k])/(ix[k+1]-ix[k]);P[n]=[a[k][1]+(a[k+1][1]-a[k][1])*t,a[k][2]+(a[k+1][2]-a[k][2])*t]})}
+P["Xinbeitou"]=[P["Beitou"][0]+16,P["Beitou"][1]-14];P["Xiaobitan"]=[P["Qizhang"][0]-17,P["Qizhang"][1]+3];
+const names=Object.keys(st),hubs=names.filter(n=>st[n].size>1);
+const keysOn=L=>Object.keys(adj[L]).filter(n=>st[n].size>1);
+function path(L,a,b){const p={[a]:null},q=[a];for(let i=0;i<q.length;i++){const n=q[i];if(n===b)break;for(const m of adj[L][n])if(!(m in p)){p[m]=n;q.push(m)}}const r=[];for(let n=b;n!=null;n=p[n])r.unshift(n);return r}
+const dist=(L,a,b)=>path(L,a,b).length-1;
+const $=id=>document.getElementById(id);
+const col=L=>`var(--${L})`;
+const dots=n=>[...st[n]].map(L=>`<span class="dot" style="background:${col(L)}"></span>`).join("");
+
+function best(S,B,al=""){
+  const K=new Set([...hubs,S,B]),D={},prev={},todo=new Set(),k=(n,l)=>n+"|"+l;
+  D[k(S,al)]=0;todo.add(k(S,al));
+  while(todo.size){
+    let u=null;for(const s of todo)if(u===null||D[s]<D[u])u=s;
+    todo.delete(u);const [n,a]=u.split("|");
+    if(n===B){const legs=[];let v=u;while(prev[v]){legs.unshift(prev[v]);v=prev[v].u}return{legs,time:D[u]}}
+    for(const L of st[n]){if(L===a)continue;
+      for(const y of K){if(y===n||!st[y].has(L))continue;
+        const s=dist(L,n,y),c=D[u]+s*MIN_STOP+(a?MIN_XFER:0),v=k(y,L);
+        if(D[v]==null||c<D[v]){D[v]=c;prev[v]={u,L,from:n,to:y,s};todo.add(v)}}}
+  }
+}
+
+function mapSVG(){
+  const ink="#1c2630",halo="paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round";
+  let s=`<svg width="530" height="380" viewBox="0 0 530 380" role="img" aria-label="Taipei MRT network map">`;
+  for(const L in AN)s+=`<polyline points="${AN[L].map(a=>a[1]+","+a[2]).join(" ")}" fill="none" style="stroke:${col(L)}" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>`;
+  s+=`<line x1="${P.Beitou[0]}" y1="${P.Beitou[1]}" x2="${P.Xinbeitou[0]}" y2="${P.Xinbeitou[1]}" style="stroke:var(--R)" stroke-width="6" stroke-linecap="round"/>`;
+  s+=`<line x1="${P.Qizhang[0]}" y1="${P.Qizhang[1]}" x2="${P.Xiaobitan[0]}" y2="${P.Xiaobitan[1]}" style="stroke:var(--G)" stroke-width="6" stroke-linecap="round"/>`;
+  for(const l of legs){const pts=path(l.L,l.from,l.to).map(n=>P[n].join(",")).join(" ");
+    s+=`<polyline points="${pts}" fill="none" stroke="${ink}" stroke-opacity=".3" stroke-width="15" stroke-linejoin="round" stroke-linecap="round"/><polyline points="${pts}" fill="none" style="stroke:${col(l.L)}" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>`}
+  const tag=(t,L,x,y,anc)=>`<text x="${x}" y="${y}" text-anchor="${anc}" font-size="12" font-weight="700" style="fill:${L==="O"?"#b57a00":col(L)};${halo}">${t}</text>`;
+  s+=tag("Red Line","R",40,12,"start")+tag("Blue Line","BL",6,282,"start")+tag("Green Line","G",165,368,"start")+tag("Orange Line","O",6,100,"start")+tag("Brown Line","BR",398,364,"start");
+  for(const h of hubs){const [x,y]=P[h],l=HL[h];
+    s+=`<circle cx="${x}" cy="${y}" r="6.5" fill="#fff" stroke="${ink}" stroke-width="2.5"/>`;
+    if(l)s+=`<text x="${x+l[2]}" y="${y+l[3]}" text-anchor="${l[1]}" font-size="11" font-weight="600" fill="${ink}" style="${halo}">${l[0]}</text>`}
+  s+=`<circle cx="${P[cur][0]}" cy="${P[cur][1]}" r="12" fill="#fff" fill-opacity=".5" stroke="${ink}" stroke-width="3.5"/>`;
+  const pin=(n,t,f)=>{const [x,y]=P[n];return `<line x1="${x}" y1="${y}" x2="${x}" y2="${y-12}" stroke="${ink}" stroke-width="2.5"/><circle cx="${x}" cy="${y-20}" r="10" fill="${f?ink:"#fff"}" stroke="${ink}" stroke-width="3"/><text x="${x}" y="${y-16}" text-anchor="middle" font-size="12" font-weight="700" fill="${f?"#fff":ink}">${t}</text>`};
+  return s+pin(A,"A",1)+pin(B,"B",0)+`</svg>`;
+}
+
+let A,B,legs,cur,arr,round,score,hints,hintLeg;
+const time=()=>legs.reduce((a,l)=>a+l.s*MIN_STOP,0)+Math.max(0,legs.length-1)*MIN_XFER;
+function pick(){
+  do{A=names[Math.random()*names.length|0];B=names[Math.random()*names.length|0]}
+  while(A===B||[...st[A]].some(l=>st[B].has(l)));
+}
+function newRound(){pick();legs=[];cur=A;arr="";hints=0;hintLeg=null;
+  $("done").classList.add("hide");$("ask").classList.remove("hide");$("msg").textContent="";draw()}
+function draw(){
+  $("stat").innerHTML=`Round <b>${round+1}</b> of ${ROUNDS} &nbsp; <b>${score}</b> pts`;
+  $("a").textContent=A;$("b").textContent=B;$("al").innerHTML=dots(A);$("bl").innerHTML=dots(B);
+  $("t").textContent=time()+" min";$("x").textContent=Math.max(0,legs.length-1);
+  $("log").innerHTML=legs.map((l,i)=>`<li style="--c:${col(l.L)}">${i?`<em>Transfer, 5 min</em><br>`:""}<b>${LN[l.L]}</b> to ${l.to}<br><em>${l.s} stop${l.s>1?"s":""}, ${l.s*MIN_STOP} min</em></li>`).join("");
+  $("here").innerHTML=`You are at <b>${cur}</b>. Where to next?`;
+  const m=$("map");m.innerHTML=mapSVG();
+  m.scrollTo({left:P[cur][0]-m.clientWidth/2,top:P[cur][1]-m.clientHeight/2,behavior:"smooth"});
+  const o=[];
+  for(const L of st[cur]){if(L===arr)continue;
+    const ys=new Set(keysOn(L));if(st[B].has(L))ys.add(B);
+    for(const y of ys){if(y===cur)continue;o.push({L,y,s:dist(L,cur,y)})}}
+  o.sort((p,q)=>(q.y===B)-(p.y===B)||p.L.localeCompare(q.L)||p.s-q.s);
+  $("opts").innerHTML=o.map((p,i)=>`<button class="opt ${p.y===B?"goal":""} ${hintLeg&&hintLeg.L===p.L&&hintLeg.to===p.y?"hint":""}" style="--c:${col(p.L)}" data-i="${i}"><b>${p.y===B?"Arrive at ":""}${p.y}</b><span>${LN[p.L].replace(" Line","")}, ${p.s} stop${p.s>1?"s":""}</span></button>`).join("");
+  $("opts").onclick=e=>{const b=e.target.closest(".opt");if(!b)return;
+    const p=o[+b.dataset.i];legs.push({L:p.L,from:cur,to:p.y,s:p.s});cur=p.y;arr=p.L;hintLeg=null;$("msg").textContent="";
+    cur===B?finish():draw()};
+  $("undo").classList.toggle("hide",!legs.length);
+}
+$("undo").onclick=()=>{const l=legs.pop();cur=l.from;arr=legs.length?legs[legs.length-1].L:"";hintLeg=null;$("msg").textContent="";draw()};
+$("hintBtn").onclick=()=>{
+  const h=best(cur,B,arr).legs[0];hints++;hintLeg={L:h.L,to:h.to};
+  $("msg").innerHTML=`Try the <b>${LN[h.L]}</b> to <b>${h.to}</b>. (−${HINT_COST} pts)`;draw()};
+function finish(){
+  draw();$("ask").classList.add("hide");$("done").classList.remove("hide");
+  const me=time(),bt=best(A,B),raw=Math.round(100*bt.time/me),p=Math.max(0,raw-hints*HINT_COST);score+=p;
+  $("stat").innerHTML=`Round <b>${round+1}</b> of ${ROUNDS} &nbsp; <b>${score}</b> pts`;
+  const route=bt.legs.map(l=>`<b>${LN[l.L]}</b> to ${l.to} <span class="muted">(${l.s} stops)</span>`).join("<br>");
+  $("done").innerHTML=`<div class="big">+${p}</div><p>${raw===100?"Perfect! That is the fastest route.":`Your trip took ${me} min. The fastest is ${bt.time} min.`}${hints?` <span class="muted">Hints used: ${hints}.</span>`:""}</p>${raw<100?`<p class="muted">Fastest route:</p><p>${route}</p>`:""}<button class="main" id="next">${round+1<ROUNDS?"Next trip":"See results"}</button>`;
+  $("next").onclick=()=>{if(++round<ROUNDS)newRound();else end()};
+}
+function end(){
+  $("play").classList.add("hide");$("end").classList.remove("hide");
+  $("final").textContent=score+" / "+ROUNDS*100;
+  const a=score/ROUNDS;
+  $("rank").textContent=a>=90?"Metro master. You could run the control room.":a>=70?"Daily commuter. You know the shortcuts.":a>=45?"Visitor with an EasyCard. Getting there.":"Lost at Taipei Main Station. Try again!";
+}
+function start(){round=0;score=0;$("end").classList.add("hide");$("play").classList.remove("hide");newRound()}
+$("again").onclick=start;
+start();
+</script>
+</body>
+</html>
